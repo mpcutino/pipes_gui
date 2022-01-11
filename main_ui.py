@@ -3,10 +3,14 @@ import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QSizePolicy
 from PyQt5.QtGui import QPixmap, QImage
 
-from ui.design import Ui_MainWindow
+import numpy as np
+import matplotlib.pyplot as plt
 
-from image_processing.cut_methods.standard_filter import pablo_otsu_pipes_portion, gabor_pipes
-from image_processing.cut_methods.portion_selection import slide_window
+from app.ui.design import Ui_MainWindow
+
+from app.image_processing.cut_methods.depth_filter import load_midas, get_depth_pred, load_midas_transform
+from app.image_processing.cut_methods.standard_filter import pablo_otsu_pipes_portion, gabor_pipes
+from app.image_processing.cut_methods.portion_selection import slide_window
 
 
 class MainApp(QMainWindow, Ui_MainWindow):
@@ -24,6 +28,14 @@ class MainApp(QMainWindow, Ui_MainWindow):
         self.cbox_algorithm.addItems(self.algorithms)
         self.cbox_algorithm.currentTextChanged.connect(self.filter_method_change)
         self.img_path = None
+
+        # Model
+        model_type = "DPT_Large"  # MiDaS v3 - Large     (highest accuracy, slowest inference speed)
+        # model_type = "DPT_Hybrid"   # MiDaS v3 - Hybrid    (medium accuracy, medium inference speed)
+        # model_type = "MiDaS_small"  # MiDaS v2.1 - Small   (lowest accuracy, highest inference speed)
+
+        self.depth_model = load_midas(model_type)
+        self.depth_transform = load_midas_transform(model_type)
 
     def load_image(self):
         fname = QFileDialog.getOpenFileName(self, 'Open image', filter="Image files (*.jpg *.png *.JPG)")
@@ -50,7 +62,14 @@ class MainApp(QMainWindow, Ui_MainWindow):
         if self.img_path:
             filtered_contours, contour_img = None, None
             if al_index == 0:
-                pass
+                filtered_contours, contour_img = get_depth_pred(self.depth_model, self.img_path, self.depth_transform)
+                # contour_img = (contour_img - contour_img.min())*(255/(contour_img.max() - contour_img.min()))
+                # contour_img = contour_img.astype(np.uint8)
+                plt.imshow(contour_img)
+                plt.show()
+                plt.close()
+                print(contour_img.min(), contour_img.max())
+                print(contour_img.shape)
             if al_index == 1:
                 filtered_contours, contour_img = pablo_otsu_pipes_portion(self.img_path)
             if al_index == 2:
@@ -61,10 +80,11 @@ class MainApp(QMainWindow, Ui_MainWindow):
                 self.lbl_resultImg.setPixmap(QPixmap(filter_qimg))
                 self.lbl_resultImg.setScaledContents(True)
 
-                cut_img = slide_window(self.img_path, filtered_contours)
-                detect_qimg = self.get_QImg(cut_img)
-                self.lbl_pipesImg.setPixmap(QPixmap(detect_qimg))
-                self.lbl_pipesImg.setScaledContents(True)
+                cut_img = slide_window(self.img_path, filtered_contours) #if al_index != 0 else None
+                if cut_img is not None:
+                    detect_qimg = self.get_QImg(cut_img)
+                    self.lbl_pipesImg.setPixmap(QPixmap(detect_qimg))
+                    self.lbl_pipesImg.setScaledContents(True)
 
     @staticmethod
     def get_QImg(img):

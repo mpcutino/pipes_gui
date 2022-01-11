@@ -33,11 +33,17 @@ def gabor_pipes(img_path):
     # ret, blur = cv2.threshold(img_gray, 100, 255, cv2.THRESH_TOZERO)
     ret, blur = cv2.threshold(img_gray, 0, 255, cv2.THRESH_TOZERO | cv2.THRESH_OTSU)
 
-    g_kernel = cv2.getGaborKernel((21, 21), 2.0, 0.9*np.pi / 2, 10.0, 0.06, 0, ktype=cv2.CV_32F)
-    g_kernel /= 1.0 * g_kernel.sum()  # Brightness normalization
-    filtered_img = cv2.filter2D(blur, cv2.CV_8UC3, g_kernel)
+    filtered_contours, gabor_th = get_gabor_contours(blur)
 
-    ret, filtered_img = cv2.threshold(filtered_img, 180, 255, cv2.THRESH_BINARY)
+    return filtered_contours, gabor_th
+
+
+def get_gabor_contours(gray_img, thr=180):
+    g_kernel = cv2.getGaborKernel((21, 21), 2.0, 0.9 * np.pi / 2, 10.0, 0.06, 0, ktype=cv2.CV_32F)
+    g_kernel /= 1.0 * g_kernel.sum()  # Brightness normalization
+    filtered_img = cv2.filter2D(gray_img, cv2.CV_8UC3, g_kernel)
+
+    ret, filtered_img = cv2.threshold(filtered_img, thr, 255, cv2.THRESH_BINARY)
 
     contours, hierarchy = cv2.findContours(filtered_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     print(len(contours))
