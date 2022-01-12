@@ -25,7 +25,7 @@ def pablo_otsu_pipes_portion(img_path):
     return filtered_contours, threeD_thresh
 
 
-def gabor_pipes(img_path):
+def gabor_pipes(img_path, cond=None):
     img = get_image(img_path)
 
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -33,12 +33,12 @@ def gabor_pipes(img_path):
     # ret, blur = cv2.threshold(img_gray, 100, 255, cv2.THRESH_TOZERO)
     ret, blur = cv2.threshold(img_gray, 0, 255, cv2.THRESH_TOZERO | cv2.THRESH_OTSU)
 
-    filtered_contours, gabor_th = get_gabor_contours(blur)
+    filtered_contours, gabor_th = get_gabor_contours(blur, cond=cond)
 
     return filtered_contours, gabor_th
 
 
-def get_gabor_contours(gray_img, thr=180):
+def get_gabor_contours(gray_img, thr=180, cond=None):
     g_kernel = cv2.getGaborKernel((21, 21), 2.0, 0.9 * np.pi / 2, 10.0, 0.06, 0, ktype=cv2.CV_32F)
     g_kernel /= 1.0 * g_kernel.sum()  # Brightness normalization
     filtered_img = cv2.filter2D(gray_img, cv2.CV_8UC3, g_kernel)
@@ -46,10 +46,23 @@ def get_gabor_contours(gray_img, thr=180):
     ret, filtered_img = cv2.threshold(filtered_img, thr, 255, cv2.THRESH_BINARY)
 
     contours, hierarchy = cv2.findContours(filtered_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    hierarchy = hierarchy[0]    # for some reason, cv2 has a double list in python
     print(len(contours))
 
+    parents = {}
+    for i in range(len(contours)):
+        parents.setdefault(hierarchy[i][-1], 0)
+        parents[hierarchy[i][-1]] += 1
+    print(parents)
+
+    hierarchy_filtered_c = []
+    for i in range(len(contours)):
+        if i not in parents or parents[i] <= 5:
+            hierarchy_filtered_c.append(contours[i])
+    contours = hierarchy_filtered_c
+
     gabor_th = to_three_shape(filtered_img)
-    filtered_contours = filter_contours(contours)
+    filtered_contours = filter_contours(contours, cond=cond)
     draw_colored_contours(filtered_contours, None, gabor_th, use_rect=False)
 
     return filtered_contours, gabor_th

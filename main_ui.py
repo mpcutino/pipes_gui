@@ -24,7 +24,7 @@ class MainApp(QMainWindow, Ui_MainWindow):
         self.lbl_resultImg.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.lbl_pipesImg.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
 
-        self.algorithms = ["depth", "otsu_threshold", "gabor_filter"]
+        self.algorithms = ["gabor_filter", "depth", "otsu_threshold"]
         self.cbox_algorithm.addItems(self.algorithms)
         self.cbox_algorithm.currentTextChanged.connect(self.filter_method_change)
         self.img_path = None
@@ -61,7 +61,7 @@ class MainApp(QMainWindow, Ui_MainWindow):
     def change_result_image(self, al_index):
         if self.img_path:
             filtered_contours, contour_img = None, None
-            if al_index == 0:
+            if al_index == 1:
                 filtered_contours, contour_img = get_depth_pred(self.depth_model, self.img_path, self.depth_transform)
                 # contour_img = (contour_img - contour_img.min())*(255/(contour_img.max() - contour_img.min()))
                 # contour_img = contour_img.astype(np.uint8)
@@ -70,17 +70,19 @@ class MainApp(QMainWindow, Ui_MainWindow):
                 plt.close()
                 print(contour_img.min(), contour_img.max())
                 print(contour_img.shape)
-            if al_index == 1:
-                filtered_contours, contour_img = pablo_otsu_pipes_portion(self.img_path)
             if al_index == 2:
-                filtered_contours, contour_img = gabor_pipes(self.img_path)
+                filtered_contours, contour_img = pablo_otsu_pipes_portion(self.img_path)
+            if al_index == 0:
+                filtered_contours, contour_img = \
+                    gabor_pipes(self.img_path, cond=lambda x, y, w, h: w*h > 80 and (h/w > 5 or w/h > 5) and h < 100)
+                # gabor_pipes(self.img_path, cond=lambda x, y, w, h: w*h > 80 and (h/w > 5 or w/h > 5) and h < 50)
 
             if contour_img is not None:
                 filter_qimg = self.get_QImg(contour_img)
                 self.lbl_resultImg.setPixmap(QPixmap(filter_qimg))
                 self.lbl_resultImg.setScaledContents(True)
 
-                cut_img = slide_window(self.img_path, filtered_contours) #if al_index != 0 else None
+                cut_img = slide_window(self.img_path, filtered_contours)
                 if cut_img is not None:
                     detect_qimg = self.get_QImg(cut_img)
                     self.lbl_pipesImg.setPixmap(QPixmap(detect_qimg))
