@@ -45,30 +45,33 @@ def deginrad(degree):
     return radiant
 
 
-def get_gabor_contours(gray_img, thr=190, cond=None):
-    # g_kernel = cv2.getGaborKernel((21, 21), 2.0, 0.9 * np.pi / 2, 10.0, 0.06, 0, ktype=cv2.CV_32F)
+def get_gabor_contours(gray_img, thr=180, cond=None):
+    # gh_kernel = cv2.getGaborKernel((21, 21), 2.0, deginrad(np.pi), 10.0, 0.06, 0, ktype=cv2.CV_32F)
     gh_kernel = cv2.getGaborKernel((5, 5), 1, deginrad(90), 1, 0.1, 0, ktype=cv2.CV_32F)
     gh_kernel /= 1.0 * gh_kernel.sum()  # Brightness normalization
     # plt.imshow(gh_kernel)
     # plt.show()
     # plt.close()
     filteredh_img = cv2.filter2D(gray_img, cv2.CV_8UC3, gh_kernel)
-    # ret, filteredh_img = cv2.threshold(filteredh_img, thr, 255, cv2.THRESH_BINARY)
-    ret, filteredh_img = cv2.threshold(filteredh_img, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    ret, filteredh_img = cv2.threshold(filteredh_img, thr, 255, cv2.THRESH_BINARY)
+    # ret, filteredh_img = cv2.threshold(filteredh_img, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
-    gv_kernel = cv2.getGaborKernel((5, 5), 1, deginrad(0), 1, 0.1, 0, ktype=cv2.CV_32F)
+    gv_kernel = cv2.getGaborKernel((21, 21), 2.0, deginrad(0), 10, 0.06, 0, ktype=cv2.CV_32F)
     gv_kernel /= 1.0 * gv_kernel.sum()  # Brightness normalization
     filteredv_img = cv2.filter2D(gray_img, cv2.CV_8UC3, gv_kernel)
 
-    ret, filteredv_img = cv2.threshold(filteredv_img, thr, 255, cv2.THRESH_BINARY)
+    ret, filteredv_img = cv2.threshold(filteredv_img, 200, 255, cv2.THRESH_BINARY)
+    # filteredv_img = cv2.dilate(filteredv_img, np.ones((1, 20), np.uint8), iterations=1)
     # ret, filteredv_img = cv2.threshold(filteredv_img, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
-    filtered_img = cv2.bitwise_and(filteredh_img, filteredh_img, mask=filteredv_img)
-    # filtered_img = filteredh_img
+    # removing vertical lines from the horizontal ones
+    filtered_img = (filteredh_img - filteredv_img).clip(0, 255).astype('uint8')
+    # filtered_img = cv2.bitwise_and(filteredh_img, filteredh_img, mask=filteredv_img)
+    # filtered_img = filteredv_img
 
     # erode and dilate the image, to prevent week connections
     # kernel = np.ones((4, 15), np.uint8)
-    kernel = np.ones((2, 10), np.uint8)
+    kernel = np.ones((4, 15), np.uint8)
     # only eroding
     filtered_img = cv2.erode(filtered_img, kernel, iterations=1)
     # filtered_img = cv2.erode(filtered_img, kernel, iterations=5)

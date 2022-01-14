@@ -42,3 +42,41 @@ def slide_window(img_path, filtered_contours, window_height=20):
             up_bound = min(img.shape[0], up_bound + window_height)
             return img[low_bound:up_bound, :, :] if len(img.shape) == 3 else img[low_bound:up_bound, :]
     return img
+
+
+def sorted_x_slide_window(img_path, filtered_contours, window_height=20):
+    img = get_image(img_path)
+    # print(img.shape)
+    if len(filtered_contours):
+        rect_contours = [cv2.boundingRect(cnt) for cnt in filtered_contours]
+        rect_contours = sorted(rect_contours, key=lambda rect: rect[0])
+        # print([r[0] for r in rect_contours])
+
+        best_interval, best_sum_width = (-1, -1), 0
+        for ind_r, r in enumerate(rect_contours):
+            low_bound = r[1] - window_height//2
+            up_bound = r[1] + r[-1] + window_height//2    # the y plus the height
+
+            sum_width = r[2]
+            next_lower_x = r[0] + r[2]
+            for i in range(len(rect_contours)):
+                if ind_r == i:
+                    continue
+                y = rect_contours[i][1]
+                x = rect_contours[i][0]
+                # the new contour must be between the height of the analysed contour, and should be completely after
+                #    the analysed contour.
+                if low_bound <= y <= up_bound and x >= next_lower_x:
+                    sum_width += rect_contours[i][2]
+                    next_lower_x = x + rect_contours[i][2]
+            # print(sum_width)
+            if best_sum_width < sum_width <= img.shape[1]:
+                best_sum_width = sum_width
+                best_interval = (low_bound + window_height//2, up_bound - window_height//2)
+                # print("sw:", best_sum_width)
+        low_bound, up_bound = best_interval
+        if low_bound > 0:
+            low_bound = max(0, low_bound - window_height)
+            up_bound = min(img.shape[0], up_bound + window_height)
+            return img[low_bound:up_bound, :, :] if len(img.shape) == 3 else img[low_bound:up_bound, :]
+    return img

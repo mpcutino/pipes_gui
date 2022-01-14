@@ -15,7 +15,7 @@ from app.ui.design import Ui_MainWindow
 from app.image_processing.cut_methods.matching import gray_img_matching
 from app.image_processing.cut_methods.depth_filter import load_midas, get_depth_pred, load_midas_transform
 from app.image_processing.cut_methods.standard_filter import pablo_otsu_pipes_portion, gabor_pipes
-from app.image_processing.cut_methods.portion_selection import slide_window
+from app.image_processing.cut_methods.portion_selection import slide_window, sorted_x_slide_window
 
 from save_popup_ui import SavePopupQWidget
 
@@ -172,7 +172,9 @@ class MainApp(QMainWindow, Ui_MainWindow):
                     self.lbl_resultImg.setPixmap(QPixmap(filter_qimg))
                     self.lbl_resultImg.setScaledContents(True)
 
-                cut_img = slide_window(self.img_path, filtered_contours, window_height=20) if al_index != 3 \
+                # cut_img = slide_window(self.img_path, filtered_contours, window_height=20) if al_index != 3 \
+                #     else contour_img
+                cut_img = sorted_x_slide_window(self.img_path, filtered_contours, window_height=20) if al_index != 3 \
                     else contour_img
                 if cut_img is not None:
                     detect_qimg = self.get_QImg(cut_img)
