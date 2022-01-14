@@ -1,14 +1,18 @@
 import os
 import sys
+import shutil
+from glob import glob
+from pathlib import Path
+import matplotlib.pyplot as plt
+import numpy as np
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QSizePolicy
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5 import QtCore
 
-import matplotlib.pyplot as plt
-
 from app.ui.design import Ui_MainWindow
 
+from app.image_processing.cut_methods.matching import gray_img_matching
 from app.image_processing.cut_methods.depth_filter import load_midas, get_depth_pred, load_midas_transform
 from app.image_processing.cut_methods.standard_filter import pablo_otsu_pipes_portion, gabor_pipes
 from app.image_processing.cut_methods.portion_selection import slide_window
@@ -17,7 +21,7 @@ from save_popup_ui import SavePopupQWidget
 
 
 class MainApp(QMainWindow, Ui_MainWindow):
-    
+
     def __init__(self):
         QMainWindow.__init__(self)
         self.setupUi(self)
@@ -31,7 +35,7 @@ class MainApp(QMainWindow, Ui_MainWindow):
         self.btn_SaveFilter.clicked.connect(self.save_filter_img)
         self.btn_SaveCrop.clicked.connect(self.save_crop_img)
 
-        self.algorithms = ["gabor_filter", "depth", "otsu_threshold"]
+        self.algorithms = ["gabor_filter", "depth", "otsu_threshold", "simple_matching"]
         self.cbox_algorithm.addItems(self.algorithms)
         self.cbox_algorithm.currentTextChanged.connect(self.filter_method_change)
         self.img_path = None
@@ -46,6 +50,11 @@ class MainApp(QMainWindow, Ui_MainWindow):
         self.default_save_format = "png"
         self.popup_w = None
 
+        self.progressBar.setValue(0)
+        self.progressBar.setMaximum(100)
+
+        self.matching_img = "/home/mpcutino/Codes/pipes_gui/to_match.JPG"
+
         # Model
         model_type = "DPT_Large"  # MiDaS v3 - Large     (highest accuracy, slowest inference speed)
         # model_type = "DPT_Hybrid"   # MiDaS v3 - Hybrid    (medium accuracy, medium inference speed)
@@ -56,13 +65,33 @@ class MainApp(QMainWindow, Ui_MainWindow):
 
     def filter_and_save_all(self):
         self.popup_w = SavePopupQWidget(self.cbox_algorithm.currentText())
-        # self.popup_w.setGeometry(QtCore.QRect(100, 100, 100, 120))
-        # self.popup_w.show()
         self.popup_w.exec_()
         if self.popup_w.result():
+            self.progressBar.setValue(0)
+            self.setEnabled(False)
             # the user says: Ok
             ext = self.popup_w.cBox_Ext.currentText()
             print(ext)
+            tmp_img_path = self.img_path
+            search_p = os.path.join(self.input_folder, "*.{0}".format(ext))
+            search_results = glob(search_p)
+            processed = 0
+            for f in search_results:
+                self.img_path = f
+                qcrop = self.change_result_image(self.cbox_algorithm.currentIndex(), paint=False)
+                dest = os.path.join(self.save_folder, Path(f).name)
+                if qcrop is None:
+                    shutil.copy(f, dest)
+                else:
+                    qcrop.save(dest, format="png")
+                processed += 1
+                self.progressBar.setValue(int(100 * processed / len(search_results)))
+                # self.progressBar.setValue(int(100*processed/10))
+                # to test
+                # if processed == 10:
+                #     break
+            self.img_path = tmp_img_path
+            self.setEnabled(True)
 
     def save_input_img(self):
         self.save_img(self.lbl_image.pixmap().toImage(), "Input_Image.png")
@@ -117,35 +146,41 @@ class MainApp(QMainWindow, Ui_MainWindow):
         if value in self.algorithms:
             self.change_result_image(self.algorithms.index(value))
 
-    def change_result_image(self, al_index):
+    def change_result_image(self, al_index, paint=True):
         if self.img_path:
             filtered_contours, contour_img = None, None
             if al_index == 1:
                 filtered_contours, contour_img = get_depth_pred(self.depth_model, self.img_path, self.depth_transform)
-                # contour_img = (contour_img - contour_img.min())*(255/(contour_img.max() - contour_img.min()))
-                # contour_img = contour_img.astype(np.uint8)
                 plt.imshow(contour_img)
                 plt.show()
                 plt.close()
-                print(contour_img.min(), contour_img.max())
-                print(contour_img.shape)
             if al_index == 2:
                 filtered_contours, contour_img = pablo_otsu_pipes_portion(self.img_path)
             if al_index == 0:
                 filtered_contours, contour_img = \
-                    gabor_pipes(self.img_path, cond=lambda x, y, w, h: w*h > 80 and (h/w > 5 or w/h > 5) and h < 100)
-                # gabor_pipes(self.img_path, cond=lambda x, y, w, h: w*h > 80 and (h/w > 5 or w/h > 5) and h < 50)
+                    gabor_pipes(self.img_path, cond=lambda x, y, w, h: w * h > 50 and
+                                                                       (h / w > 5 or w / h > 5)
+                                                                       # (h <= 20 or w <= 20)
+                                )
+            if al_index == 3:
+                contour_img = gray_img_matching(self.img_path, self.matching_img)
 
             if contour_img is not None:
-                filter_qimg = self.get_QImg(contour_img)
-                self.lbl_resultImg.setPixmap(QPixmap(filter_qimg))
-                self.lbl_resultImg.setScaledContents(True)
+                if paint:
+                    filter_qimg = self.get_QImg(contour_img) if al_index != 3 else \
+                        self.get_QImg(np.ones_like(contour_img, dtype='uint8') * 255)
+                    self.lbl_resultImg.setPixmap(QPixmap(filter_qimg))
+                    self.lbl_resultImg.setScaledContents(True)
 
-                cut_img = slide_window(self.img_path, filtered_contours)
+                cut_img = slide_window(self.img_path, filtered_contours, window_height=20) if al_index != 3 \
+                    else contour_img
                 if cut_img is not None:
                     detect_qimg = self.get_QImg(cut_img)
-                    self.lbl_pipesImg.setPixmap(QPixmap(detect_qimg))
-                    self.lbl_pipesImg.setScaledContents(True)
+                    if paint:
+                        self.lbl_pipesImg.setPixmap(QPixmap(detect_qimg))
+                        self.lbl_pipesImg.setScaledContents(True)
+                    return detect_qimg
+        return None
 
     def use_folder_change(self, state):
         if state == QtCore.Qt.Checked:
@@ -166,9 +201,8 @@ class MainApp(QMainWindow, Ui_MainWindow):
         height, width, channel = img.shape if len(img.shape) == 3 else (img.shape[0], img.shape[1], 1)
 
         bytesPerLine = channel * width
-        result_qImg = QImage(img.data, width, height, bytesPerLine, format_).rgbSwapped()
-
-        return result_qImg
+        result_qImg = QImage(img.data, width, height, bytesPerLine, format_)
+        return result_qImg.rgbSwapped() if channel == 3 else result_qImg
 
 
 if __name__ == '__main__':

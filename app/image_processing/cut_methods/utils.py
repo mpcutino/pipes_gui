@@ -22,8 +22,11 @@ def filter_contours(contours, cond=None):
         cond = lambda x, y, w, h: w*h > 80 and (h/w > 5 or w/h > 5) and h < 25
     for i in range(len(contours)):
         cnt = contours[i]
-        x, y, w, h = cv2.boundingRect(cnt)
-        if cond(x, y, w, h):
+        # x, y, w, h = cv2.boundingRect(cnt)
+        (cx, cy), (w, h), angle = cv2.minAreaRect(cnt)  # h, w is what works
+        # print("----", w * h)
+        # print((w, h, angle))
+        if cond(cx, cy, w, h):
             filtered_contours.append(cnt)
     return filtered_contours
 
