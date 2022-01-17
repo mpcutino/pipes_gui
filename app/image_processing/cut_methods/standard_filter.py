@@ -45,9 +45,9 @@ def deginrad(degree):
     return radiant
 
 
-def get_gabor_contours(gray_img, thr=180, cond=None):
-    # gh_kernel = cv2.getGaborKernel((21, 21), 2.0, deginrad(np.pi), 10.0, 0.06, 0, ktype=cv2.CV_32F)
-    gh_kernel = cv2.getGaborKernel((5, 5), 1, deginrad(90), 1, 0.1, 0, ktype=cv2.CV_32F)
+def get_gabor_contours(gray_img, thr=215, cond=None):
+    gh_kernel = cv2.getGaborKernel((21, 21), 2.0, deginrad(90), 10.0, 0.06, 0, ktype=cv2.CV_32F)
+    # gh_kernel = cv2.getGaborKernel((5, 5), 1, deginrad(90), 1, 0.1, 0, ktype=cv2.CV_32F)
     gh_kernel /= 1.0 * gh_kernel.sum()  # Brightness normalization
     # plt.imshow(gh_kernel)
     # plt.show()
@@ -60,22 +60,23 @@ def get_gabor_contours(gray_img, thr=180, cond=None):
     gv_kernel /= 1.0 * gv_kernel.sum()  # Brightness normalization
     filteredv_img = cv2.filter2D(gray_img, cv2.CV_8UC3, gv_kernel)
 
-    ret, filteredv_img = cv2.threshold(filteredv_img, 200, 255, cv2.THRESH_BINARY)
-    # filteredv_img = cv2.dilate(filteredv_img, np.ones((1, 20), np.uint8), iterations=1)
+    ret, filteredv_img = cv2.threshold(filteredv_img, thr, 255, cv2.THRESH_BINARY)
     # ret, filteredv_img = cv2.threshold(filteredv_img, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    # erode and dilate the image, to prevent week connections
+    filteredv_img = cv2.erode(filteredv_img, np.ones((4, 4)), iterations=1)
+    filteredv_img = cv2.dilate(filteredv_img, np.ones((25, 2), np.uint8), iterations=1)
 
     # removing vertical lines from the horizontal ones
     filtered_img = (filteredh_img - filteredv_img).clip(0, 255).astype('uint8')
     # filtered_img = cv2.bitwise_and(filteredh_img, filteredh_img, mask=filteredv_img)
     # filtered_img = filteredv_img
 
-    # erode and dilate the image, to prevent week connections
     # kernel = np.ones((4, 15), np.uint8)
-    kernel = np.ones((4, 15), np.uint8)
+    kernel = np.ones((2, 2), np.uint8)
     # only eroding
-    filtered_img = cv2.erode(filtered_img, kernel, iterations=1)
+    filtered_img = cv2.erode(filtered_img, kernel, iterations=2)
+    filtered_img = cv2.dilate(filtered_img, np.ones((2, 2), np.uint8), iterations=1)
     # filtered_img = cv2.erode(filtered_img, kernel, iterations=5)
-    # filtered_img = cv2.dilate(filtered_img, np.ones((2, 2), np.uint8), iterations=1)
     # filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_OPEN, kernel)
 
     contours, hierarchy = cv2.findContours(filtered_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -89,11 +90,11 @@ def get_gabor_contours(gray_img, thr=180, cond=None):
         parents[hierarchy[i][-1]] += 1
     # print(parents)
 
-    hierarchy_filtered_c = []
-    for i in range(len(contours)):
-        if i not in parents or parents[i] <= 1:
-            hierarchy_filtered_c.append(contours[i])
-    contours = hierarchy_filtered_c
+    # hierarchy_filtered_c = []
+    # for i in range(len(contours)):
+    #     if i not in parents or parents[i] <= 1:
+    #         hierarchy_filtered_c.append(contours[i])
+    # contours = hierarchy_filtered_c
 
     # area_filter_c = []
     # for cnt in contours:
@@ -108,9 +109,11 @@ def get_gabor_contours(gray_img, thr=180, cond=None):
     #     # plt.show()
     #     # plt.close()
     #     c_area = (masked > 0).sum()
-    #     print(c_area, w * h, w, h)
-    #     if c_area >= 0.5*w*h and w*h > 0:
-    #         print(c_area, w * h, w, h)
+    #     if h == 0:
+    #         # it is a line
+    #         h += 1
+    #     if c_area >= 0.75*w*h and w*h > 0:
+    #         # print(c_area, w * h, w, h)
     #         area_filter_c.append(cnt)
     # print("elem area", len(area_filter_c))
     # contours = area_filter_c
@@ -128,4 +131,4 @@ def get_gabor_contours(gray_img, thr=180, cond=None):
     draw_colored_contours(filtered_contours, None, gabor_th, use_rect=False)
 
     return filtered_contours, gabor_th
-    # return filtered_contours, filtered_img
+    # return filtered_contours, filteredv_img

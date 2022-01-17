@@ -60,8 +60,8 @@ class MainApp(QMainWindow, Ui_MainWindow):
         # model_type = "DPT_Hybrid"   # MiDaS v3 - Hybrid    (medium accuracy, medium inference speed)
         # model_type = "MiDaS_small"  # MiDaS v2.1 - Small   (lowest accuracy, highest inference speed)
 
-        self.depth_model = load_midas(model_type)
-        self.depth_transform = load_midas_transform(model_type)
+        # self.depth_model = load_midas(model_type)
+        # self.depth_transform = load_midas_transform(model_type)
 
     def filter_and_save_all(self):
         self.popup_w = SavePopupQWidget(self.cbox_algorithm.currentText())
