@@ -125,6 +125,16 @@
           </widget>
          </item>
          <item>
+          <widget class="QLabel" name="lbl_VIS_img">
+           <property name="text">
+            <string>VIS image</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item>
           <widget class="QPushButton" name="btn_SaveCrop">
            <property name="text">
             <string>Save Crop</string>
