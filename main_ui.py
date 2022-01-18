@@ -13,7 +13,6 @@ from PyQt5 import QtCore
 from app.ui.design import Ui_MainWindow
 
 from app.image_processing.cut_methods.matching import gray_img_matching
-from app.image_processing.cut_methods.depth_filter import load_midas, get_depth_pred, load_midas_transform
 from app.image_processing.cut_methods.standard_filter import pablo_otsu_pipes_portion, gabor_pipes
 from app.image_processing.cut_methods.portion_selection import slide_window, sorted_x_slide_window
 
@@ -36,7 +35,7 @@ class MainApp(QMainWindow, Ui_MainWindow):
         self.btn_SaveFilter.clicked.connect(self.save_filter_img)
         self.btn_SaveCrop.clicked.connect(self.save_crop_img)
 
-        self.algorithms = ["gabor_filter", "depth", "otsu_threshold", "simple_matching"]
+        self.algorithms = ["gabor_filter", "otsu_threshold", "simple_matching"]
         self.cbox_algorithm.addItems(self.algorithms)
         self.cbox_algorithm.currentTextChanged.connect(self.filter_method_change)
         self.img_path = None
@@ -54,15 +53,15 @@ class MainApp(QMainWindow, Ui_MainWindow):
         self.progressBar.setValue(0)
         self.progressBar.setMaximum(100)
 
+        self.spinBox_ThrValue.setValue(215)
+        self.spinBox_ThrValue.valueChanged.connect(self.threshold_change)
+
         self.matching_img = "/home/mpcutino/Codes/pipes_gui/to_match.JPG"
 
-        # Model
-        model_type = "DPT_Large"  # MiDaS v3 - Large     (highest accuracy, slowest inference speed)
-        # model_type = "DPT_Hybrid"   # MiDaS v3 - Hybrid    (medium accuracy, medium inference speed)
-        # model_type = "MiDaS_small"  # MiDaS v2.1 - Small   (lowest accuracy, highest inference speed)
-
-        # self.depth_model = load_midas(model_type)
-        # self.depth_transform = load_midas_transform(model_type)
+    def threshold_change(self, value):
+        if self.algorithms[self.cbox_algorithm.currentIndex()] == "gabor_filter":
+            print(value)
+            self.change_result_image(self.cbox_algorithm.currentIndex())
 
     def filter_and_save_all(self):
         self.popup_w = SavePopupQWidget(self.cbox_algorithm.currentText())
@@ -147,36 +146,33 @@ class MainApp(QMainWindow, Ui_MainWindow):
         if value in self.algorithms:
             self.change_result_image(self.algorithms.index(value))
 
+            self.gbox_GaborParams.setEnabled(value == "gabor_filter")
+
     def change_result_image(self, al_index, paint=True):
-        if self.img_path:
+        if self.img_path and 0 <= al_index < len(self.algorithms):
+            algorithm = self.algorithms[al_index]
             filtered_contours, contour_img = None, None
-            if al_index == 1:
-                filtered_contours, contour_img = get_depth_pred(self.depth_model, self.img_path, self.depth_transform)
-                plt.imshow(contour_img)
-                plt.show()
-                plt.close()
-            if al_index == 2:
+            if algorithm == "otsu_threshold":
                 filtered_contours, contour_img = pablo_otsu_pipes_portion(self.img_path)
-            if al_index == 0:
+            if algorithm == "gabor_filter":
                 filtered_contours, contour_img = \
-                    gabor_pipes(self.img_path, cond=lambda x, y, w, h: w * h > 50 and
-                                                                       (h / w > 5 or w / h > 5)
-                                                                       # (h <= 20 or w <= 20)
-                                )
-            if al_index == 3:
+                    gabor_pipes(
+                        self.img_path,
+                        cond=lambda x, y, w, h: w * h > 50 and (h / w > 5 or w / h > 5),
+                        thr=self.spinBox_ThrValue.value()
+                    )
+            if algorithm == "simple_matching":
                 contour_img = gray_img_matching(self.img_path, self.matching_img)
 
             if contour_img is not None:
                 if paint:
-                    filter_qimg = self.get_QImg(contour_img) if al_index != 3 else \
-                        self.get_QImg(np.ones_like(contour_img, dtype='uint8') * 255)
+                    filter_qimg = self.get_QImg(contour_img) if algorithm != "simple_matching" else \
+                        self.get_QImg(np.ones_like(contour_img[0], dtype='uint8') * 255)
                     self.lbl_resultImg.setPixmap(QPixmap(filter_qimg))
                     self.lbl_resultImg.setScaledContents(True)
 
-                # cut_img = slide_window(self.img_path, filtered_contours, window_height=20) if al_index != 3 \
-                #     else contour_img
                 cut_img, vis_img = sorted_x_slide_window(self.img_path, filtered_contours, window_height=20) \
-                    if al_index != 3 else (contour_img, None)
+                    if algorithm != "simple_matching" else contour_img
                 if cut_img is not None:
                     detect_qimg = self.get_QImg(cut_img)
                     if paint:

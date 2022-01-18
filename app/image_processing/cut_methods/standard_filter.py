@@ -26,7 +26,7 @@ def pablo_otsu_pipes_portion(img_path):
     return filtered_contours, threeD_thresh
 
 
-def gabor_pipes(img_path, cond=None):
+def gabor_pipes(img_path, cond=None, thr=215):
     img = get_image(img_path)
 
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -35,7 +35,7 @@ def gabor_pipes(img_path, cond=None):
     ret, blur = cv2.threshold(img_gray, 0, 255, cv2.THRESH_TOZERO | cv2.THRESH_OTSU)
     # blur = img_gray
 
-    filtered_contours, gabor_th = get_gabor_contours(blur, cond=cond)
+    filtered_contours, gabor_th = get_gabor_contours(blur, thr=thr, cond=cond)
 
     return filtered_contours, gabor_th
 

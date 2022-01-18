@@ -26,10 +26,20 @@ def gray_img_matching(img_path, matching_path):
                     min_d, mi, mj = d, i, j
     print("best match: dist-{0}, coords-{1}".format(min_d, (mi, mj)))
 
+    vis_p = img_path.replace("_IR.JPG", "_VIS.jpg")
+    vis_img = get_image(vis_p)
+
+    vis_low_bound = int(mi * vis_img.shape[0] / img.shape[0]) - 5
+    vis_up_bound = int((mi + w.shape[0]) * vis_img.shape[0] / img.shape[0]) + 5
+
+    vis_img = vis_img[vis_low_bound:vis_up_bound, :, :] \
+        if len(vis_img.shape) == 3 else vis_img[vis_low_bound:vis_up_bound, :]
+    print(vis_img.shape)
+
     # img = img[mi:mi+w.shape[0], mj:mj+w.shape[1]] if mi >= 0 else img
     img = img[mi:mi+w.shape[0], :] if mi >= 0 else img
 
-    return (img*255).astype('uint8')
+    return (img*255).astype('uint8'), vis_img
 
 
 def sift_matching(img_path, matching_path):
