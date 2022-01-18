@@ -46,8 +46,10 @@ def slide_window(img_path, filtered_contours, window_height=20):
 
 def sorted_x_slide_window(img_path, filtered_contours, window_height=20):
     img = get_image(img_path)
+    vis_p = img_path.replace("_IR.JPG", "_VIS.jpg")
+    vis_img = get_image(vis_p)
     # print(img.shape)
-    if len(filtered_contours):
+    if len(filtered_contours) and img is not None:
         rect_contours = [cv2.boundingRect(cnt) for cnt in filtered_contours]
         rect_contours = sorted(rect_contours, key=lambda rect: rect[0])
         # print([r[0] for r in rect_contours])
@@ -78,5 +80,12 @@ def sorted_x_slide_window(img_path, filtered_contours, window_height=20):
         if low_bound > 0:
             low_bound = max(0, low_bound - window_height)
             up_bound = min(img.shape[0], up_bound + window_height)
-            return img[low_bound:up_bound, :, :] if len(img.shape) == 3 else img[low_bound:up_bound, :]
-    return img
+
+            if vis_img is not None:
+                vis_low_bound = int(low_bound*vis_img.shape[0]/img.shape[0]) - 5
+                vis_up_bound = int(up_bound*vis_img.shape[0]/img.shape[0]) + 5
+
+                vis_img = vis_img[vis_low_bound:vis_up_bound, :, :] \
+                    if len(vis_img.shape) == 3 else vis_img[vis_low_bound:vis_up_bound, :]
+            return img[low_bound:up_bound, :, :] if len(img.shape) == 3 else img[low_bound:up_bound, :], vis_img
+    return img, vis_img

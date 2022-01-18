@@ -11,6 +11,8 @@ def get_image(img_path):
     cd = os.getcwd()
     os.chdir(wp.parent)
 
+    if not os.path.exists(wp.name):
+        return None
     img = cv2.imread(wp.name)
     os.chdir(cd)
     return img

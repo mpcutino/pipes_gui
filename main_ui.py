@@ -30,6 +30,7 @@ class MainApp(QMainWindow, Ui_MainWindow):
         self.lbl_image.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.lbl_resultImg.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.lbl_pipesImg.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.lbl_VIS_img.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
 
         self.btn_SaveInputImg.clicked.connect(self.save_input_img)
         self.btn_SaveFilter.clicked.connect(self.save_filter_img)
@@ -174,13 +175,17 @@ class MainApp(QMainWindow, Ui_MainWindow):
 
                 # cut_img = slide_window(self.img_path, filtered_contours, window_height=20) if al_index != 3 \
                 #     else contour_img
-                cut_img = sorted_x_slide_window(self.img_path, filtered_contours, window_height=20) if al_index != 3 \
-                    else contour_img
+                cut_img, vis_img = sorted_x_slide_window(self.img_path, filtered_contours, window_height=20) \
+                    if al_index != 3 else (contour_img, None)
                 if cut_img is not None:
                     detect_qimg = self.get_QImg(cut_img)
                     if paint:
                         self.lbl_pipesImg.setPixmap(QPixmap(detect_qimg))
                         self.lbl_pipesImg.setScaledContents(True)
+                        if vis_img is not None:
+                            vis_qimg = self.get_QImg(vis_img)
+                            self.lbl_VIS_img.setPixmap(QPixmap(vis_qimg))
+                            self.lbl_VIS_img.setScaledContents(True)
                     return detect_qimg
         return None
 
