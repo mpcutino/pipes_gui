@@ -186,6 +186,22 @@
              </property>
             </widget>
            </item>
+           <item row="1" column="0">
+            <spacer name="verticalSpacer">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeType">
+              <enum>QSizePolicy::Minimum</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
            <item row="2" column="0">
             <widget class="QPushButton" name="btn_loadInputPath">
              <property name="enabled">
@@ -226,7 +242,7 @@
               <bool>false</bool>
              </property>
              <property name="text">
-              <string>Filter and Save All</string>
+              <string>Filter and Save</string>
              </property>
             </widget>
            </item>
@@ -237,21 +253,15 @@
              </property>
             </widget>
            </item>
-           <item row="1" column="0">
-            <spacer name="verticalSpacer">
-             <property name="orientation">
-              <enum>Qt::Vertical</enum>
+           <item row="5" column="1">
+            <widget class="QCheckBox" name="chBox_onlyBroken">
+             <property name="enabled">
+              <bool>false</bool>
              </property>
-             <property name="sizeType">
-              <enum>QSizePolicy::Minimum</enum>
+             <property name="text">
+              <string>Compute only possible broken</string>
              </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>20</width>
-               <height>40</height>
-              </size>
-             </property>
-            </spacer>
+            </widget>
            </item>
           </layout>
          </widget>

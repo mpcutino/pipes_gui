@@ -12,7 +12,7 @@ from PyQt5 import QtCore
 
 from app.ui.design import Ui_MainWindow
 
-from app.image_processing.cut_methods.utils import get_pipes_contour_lowup_bound, decide_broken_by_contours, draw_img_surrounding_rect, draw_rects
+from app.image_processing.analysis import draw_cut_vis_image, broken_iterative_detection
 from app.image_processing.cut_methods.matching import gray_img_matching
 from app.image_processing.cut_methods.standard_filter import pablo_otsu_pipes_portion, gabor_pipes
 from app.image_processing.cut_methods.portion_selection import slide_window, sorted_x_slide_window
@@ -50,6 +50,8 @@ class MainApp(QMainWindow, Ui_MainWindow):
         self.btn_FilterSaveAll.clicked.connect(self.filter_and_save_all)
         self.default_save_format = "png"
         self.popup_w = None
+        self.save_only_broken = False
+        self.chBox_onlyBroken.stateChanged.connect(self.only_broken_change)
 
         self.progressBar.setValue(0)
         self.progressBar.setMaximum(100)
@@ -57,11 +59,14 @@ class MainApp(QMainWindow, Ui_MainWindow):
         self.spinBox_ThrValue.setValue(215)
         self.spinBox_ThrValue.valueChanged.connect(self.threshold_change)
 
+        self.window_h = 20
         self.matching_img = "/home/mpcutino/Codes/pipes_gui/to_match.JPG"
+
+    def only_broken_change(self, value):
+        self.save_only_broken = value == QtCore.Qt.Checked
 
     def threshold_change(self, value):
         if self.algorithms[self.cbox_algorithm.currentIndex()] == "gabor_filter":
-            print(value)
             self.change_result_image(self.cbox_algorithm.currentIndex())
 
     def filter_and_save_all(self):
@@ -79,18 +84,21 @@ class MainApp(QMainWindow, Ui_MainWindow):
             processed = 0
             for f in search_results:
                 self.img_path = f
-                qcrop = self.change_result_image(self.cbox_algorithm.currentIndex(), paint=False)
+                qcrop = self.change_result_image(self.cbox_algorithm.currentIndex(), paint=False) \
+                    if not self.save_only_broken else broken_iterative_detection(f, range(195, 225), self.window_h)
+                processed += 1
+                self.progressBar.setValue(int(100 * processed / len(search_results)))
+                print(processed)
+
+                if self.save_only_broken:
+                    if qcrop is None:
+                        continue
+                    qcrop = self.get_QImg(qcrop)
                 dest = os.path.join(self.save_folder, Path(f).name)
                 if qcrop is None:
                     shutil.copy(f, dest)
                 else:
                     qcrop.save(dest, format="png")
-                processed += 1
-                self.progressBar.setValue(int(100 * processed / len(search_results)))
-                # self.progressBar.setValue(int(100*processed/10))
-                # to test
-                # if processed == 10:
-                #     break
             self.img_path = tmp_img_path
             self.setEnabled(True)
 
@@ -172,25 +180,23 @@ class MainApp(QMainWindow, Ui_MainWindow):
                     self.lbl_resultImg.setPixmap(QPixmap(filter_qimg))
                     self.lbl_resultImg.setScaledContents(True)
 
-                window_h = 20
-                cut_img, vis_img = sorted_x_slide_window(self.img_path, filtered_contours, window_height=window_h) \
-                    if algorithm != "simple_matching" else contour_img
+                cut_img, vis_img = \
+                    sorted_x_slide_window(self.img_path, filtered_contours, window_height=self.window_h) \
+                        if algorithm != "simple_matching" else contour_img
+                if vis_img is None and cut_img is not None:
+                    vis_img = np.zeros_like(cut_img, dtype=np.uint8)
                 if algorithm == "gabor_filter" and paint and cut_img is not None:
                     # CV evaluation of possible broken envelope
-                    l, u = get_pipes_contour_lowup_bound(filtered_contours, window_h, cut_img.shape[1])
-                    br_rects = decide_broken_by_contours(filtered_contours, l - window_h//2, u + window_h//2)
-                    vis_img = draw_img_surrounding_rect(vis_img, (0, 0, 255) if len(br_rects) else (0, 255, 0))
-
-                    cut_img = draw_rects(cut_img, br_rects, (0, 0, 255), y_translate=window_h - l)
+                    cut_img, vis_img, _ = draw_cut_vis_image(cut_img, vis_img, filtered_contours, self.window_h)
                 if cut_img is not None:
                     detect_qimg = self.get_QImg(cut_img)
                     if paint:
                         self.lbl_pipesImg.setPixmap(QPixmap(detect_qimg))
                         self.lbl_pipesImg.setScaledContents(True)
-                        if vis_img is not None:
-                            vis_qimg = self.get_QImg(vis_img)
-                            self.lbl_VIS_img.setPixmap(QPixmap(vis_qimg))
-                            self.lbl_VIS_img.setScaledContents(True)
+                        # if vis_img is not None:
+                        vis_qimg = self.get_QImg(vis_img)
+                        self.lbl_VIS_img.setPixmap(QPixmap(vis_qimg))
+                        self.lbl_VIS_img.setScaledContents(True)
                     return detect_qimg
         return None
 
@@ -199,6 +205,7 @@ class MainApp(QMainWindow, Ui_MainWindow):
             self.gBox_OneImageTest.setEnabled(False)
             self.btn_LoadSaveFolder.setEnabled(True)
             self.btn_loadInputPath.setEnabled(True)
+            self.chBox_onlyBroken.setEnabled(self.cbox_algorithm.currentText() == "gabor_filter")
             if self.input_folder is not None and self.save_folder is not None:
                 self.btn_FilterSaveAll.setEnabled(True)
         else:
@@ -206,6 +213,7 @@ class MainApp(QMainWindow, Ui_MainWindow):
             self.btn_LoadSaveFolder.setEnabled(False)
             self.btn_loadInputPath.setEnabled(False)
             self.btn_FilterSaveAll.setEnabled(False)
+            self.chBox_onlyBroken.setEnabled(False)
 
     @staticmethod
     def get_QImg(img):

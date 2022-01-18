@@ -85,21 +85,16 @@ def get_pipes_contour_lowup_bound(filtered_contours, window_height, img_width):
     return best_interval
 
 
-def decide_broken_by_contours(filtered_contours, low_bound, up_bound, width_min=120, height_percent_thr=0.6):
-    print(low_bound)
-    rect_contours = [cv2.boundingRect(cnt) for cnt in filtered_contours]
-    print(rect_contours)
+def decide_broken_by_contours(filtered_contours, low_bound, up_bound, width_min=125, height_percent_thr=0.6):
+    rect_contours = [(cv2.boundingRect(cnt), cv2.contourArea(cnt)) for cnt in filtered_contours]
     # reduce rect y value to cope with the cropped image
-    rect_contours = [(x, y, w, h) for x, y, w, h in rect_contours
+    rect_contours = [((x, y, w, h), area) for (x, y, w, h), area in rect_contours
                      if low_bound <= y <= up_bound and w >= width_min]
     if len(rect_contours) == 0:
         return []
 
     max_rect_cnt = max(rect_contours, key=lambda cnt: cnt[-1])
-    print(max_rect_cnt)
-    print(rect_contours)
-    possible_broken_rects = [r for r in rect_contours if r[-1]/max_rect_cnt[-1] <= height_percent_thr]
-    print(possible_broken_rects)
+    possible_broken_rects = [r[0] for r in rect_contours if r[-1]/max_rect_cnt[-1] <= height_percent_thr]
     return possible_broken_rects
 
 
@@ -107,7 +102,6 @@ def draw_img_surrounding_rect(img, color, xy=(0, 0), wh=None, thickness=3):
     img = to_three_shape(img)
     if wh is None:
         wh = (img.shape[1], img.shape[0])
-    print('------ shape, xy', wh, xy)
     nx, ny = xy[0] + wh[0], xy[1] + wh[1]
     cv2.rectangle(img, xy, (nx, ny), color=color, thickness=thickness)
     return img

@@ -101,6 +101,8 @@ class Ui_MainWindow(object):
         self.checkBox_UseFolder = QtWidgets.QCheckBox(self.gBox_UseFolder)
         self.checkBox_UseFolder.setObjectName("checkBox_UseFolder")
         self.formLayout_5.setWidget(0, QtWidgets.QFormLayout.LabelRole, self.checkBox_UseFolder)
+        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
+        self.formLayout_5.setItem(1, QtWidgets.QFormLayout.LabelRole, spacerItem)
         self.btn_loadInputPath = QtWidgets.QPushButton(self.gBox_UseFolder)
         self.btn_loadInputPath.setEnabled(False)
         self.btn_loadInputPath.setObjectName("btn_loadInputPath")
@@ -125,8 +127,10 @@ class Ui_MainWindow(object):
         self.progressBar.setProperty("value", 0)
         self.progressBar.setObjectName("progressBar")
         self.formLayout_5.setWidget(4, QtWidgets.QFormLayout.FieldRole, self.progressBar)
-        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
-        self.formLayout_5.setItem(1, QtWidgets.QFormLayout.LabelRole, spacerItem)
+        self.chBox_onlyBroken = QtWidgets.QCheckBox(self.gBox_UseFolder)
+        self.chBox_onlyBroken.setEnabled(False)
+        self.chBox_onlyBroken.setObjectName("chBox_onlyBroken")
+        self.formLayout_5.setWidget(5, QtWidgets.QFormLayout.FieldRole, self.chBox_onlyBroken)
         self.verticalLayout_4.addWidget(self.gBox_UseFolder)
         self.horizontalLayout_6.addLayout(self.verticalLayout_4)
         self.horizontalLayout_6.setStretch(0, 3)
@@ -160,7 +164,8 @@ class Ui_MainWindow(object):
         self.checkBox_UseFolder.setText(_translate("MainWindow", "Use folder"))
         self.btn_loadInputPath.setText(_translate("MainWindow", "Input Folder"))
         self.btn_LoadSaveFolder.setText(_translate("MainWindow", "Save Folder"))
-        self.btn_FilterSaveAll.setText(_translate("MainWindow", "Filter and Save All"))
+        self.btn_FilterSaveAll.setText(_translate("MainWindow", "Filter and Save"))
+        self.chBox_onlyBroken.setText(_translate("MainWindow", "Compute only possible broken"))
 
 
 if __name__ == "__main__":
