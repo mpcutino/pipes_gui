@@ -12,6 +12,7 @@ from PyQt5 import QtCore
 
 from app.ui.design import Ui_MainWindow
 
+from app.image_processing.cut_methods.utils import get_pipes_contour_lowup_bound, decide_broken_by_contours, draw_img_surrounding_rect, draw_rects
 from app.image_processing.cut_methods.matching import gray_img_matching
 from app.image_processing.cut_methods.standard_filter import pablo_otsu_pipes_portion, gabor_pipes
 from app.image_processing.cut_methods.portion_selection import slide_window, sorted_x_slide_window
@@ -171,8 +172,16 @@ class MainApp(QMainWindow, Ui_MainWindow):
                     self.lbl_resultImg.setPixmap(QPixmap(filter_qimg))
                     self.lbl_resultImg.setScaledContents(True)
 
-                cut_img, vis_img = sorted_x_slide_window(self.img_path, filtered_contours, window_height=20) \
+                window_h = 20
+                cut_img, vis_img = sorted_x_slide_window(self.img_path, filtered_contours, window_height=window_h) \
                     if algorithm != "simple_matching" else contour_img
+                if algorithm == "gabor_filter" and paint and cut_img is not None:
+                    # CV evaluation of possible broken envelope
+                    l, u = get_pipes_contour_lowup_bound(filtered_contours, window_h, cut_img.shape[1])
+                    br_rects = decide_broken_by_contours(filtered_contours, l - window_h//2, u + window_h//2)
+                    vis_img = draw_img_surrounding_rect(vis_img, (0, 0, 255) if len(br_rects) else (0, 255, 0))
+
+                    cut_img = draw_rects(cut_img, br_rects, (0, 0, 255), y_translate=window_h - l)
                 if cut_img is not None:
                     detect_qimg = self.get_QImg(cut_img)
                     if paint:

@@ -52,3 +52,68 @@ def draw_colored_contours(contours, hierarchy, img, use_rect=False):
             cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
         else:
             cv2.drawContours(img, contours, i, color, 2, cv2.LINE_8, hierarchy, 0)
+
+
+def get_pipes_contour_lowup_bound(filtered_contours, window_height, img_width):
+    rect_contours = [cv2.boundingRect(cnt) for cnt in filtered_contours]
+    rect_contours = sorted(rect_contours, key=lambda rect: rect[0])
+    # print([r[0] for r in rect_contours])
+
+    best_interval, best_sum_width = (-1, -1), 0
+    for ind_r, r in enumerate(rect_contours):
+        low_bound = r[1] - window_height // 2
+        up_bound = r[1] + r[-1] + window_height // 2  # the y plus the height
+
+        sum_width = r[2]
+        next_lower_x = r[0] + r[2]
+        for i in range(len(rect_contours)):
+            if ind_r == i:
+                continue
+            y = rect_contours[i][1]
+            x = rect_contours[i][0]
+            # the new contour must be between the height of the analysed contour, and should be completely after
+            #    the analysed contour.
+            if low_bound <= y <= up_bound and x >= next_lower_x:
+                sum_width += rect_contours[i][2]
+                next_lower_x = x + rect_contours[i][2]
+        # print(sum_width)
+        if best_sum_width < sum_width <= img_width:
+            best_sum_width = sum_width
+            best_interval = (low_bound + window_height // 2, up_bound - window_height // 2)
+            # best_interval = low_bound, up_bound
+            # print("sw:", best_sum_width)
+    return best_interval
+
+
+def decide_broken_by_contours(filtered_contours, low_bound, up_bound, width_min=120, height_percent_thr=0.6):
+    print(low_bound)
+    rect_contours = [cv2.boundingRect(cnt) for cnt in filtered_contours]
+    print(rect_contours)
+    # reduce rect y value to cope with the cropped image
+    rect_contours = [(x, y, w, h) for x, y, w, h in rect_contours
+                     if low_bound <= y <= up_bound and w >= width_min]
+    if len(rect_contours) == 0:
+        return []
+
+    max_rect_cnt = max(rect_contours, key=lambda cnt: cnt[-1])
+    print(max_rect_cnt)
+    print(rect_contours)
+    possible_broken_rects = [r for r in rect_contours if r[-1]/max_rect_cnt[-1] <= height_percent_thr]
+    print(possible_broken_rects)
+    return possible_broken_rects
+
+
+def draw_img_surrounding_rect(img, color, xy=(0, 0), wh=None, thickness=3):
+    img = to_three_shape(img)
+    if wh is None:
+        wh = (img.shape[1], img.shape[0])
+    print('------ shape, xy', wh, xy)
+    nx, ny = xy[0] + wh[0], xy[1] + wh[1]
+    cv2.rectangle(img, xy, (nx, ny), color=color, thickness=thickness)
+    return img
+
+
+def draw_rects(img, rects, color, thickness=1, y_translate=0):
+    for x, y, w, h in rects:
+        img = draw_img_surrounding_rect(img, color, (x, y + y_translate), (w, h), thickness=thickness)
+    return img
