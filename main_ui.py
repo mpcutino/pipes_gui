@@ -82,23 +82,38 @@ class MainApp(QMainWindow, Ui_MainWindow):
             search_p = os.path.join(self.input_folder, "*.{0}".format(ext))
             search_results = glob(search_p)
             processed = 0
+            two_imgs = 1    # if we are saving one or two images
             for f in search_results:
+                if not f.endswith(ext):
+                    continue
                 self.img_path = f
-                qcrop = self.change_result_image(self.cbox_algorithm.currentIndex(), paint=False) \
-                    if not self.save_only_broken else broken_iterative_detection(f, range(195, 225), self.window_h)
-                processed += 1
+                ir_cut, vis_img, filter_img = self.get_ir_vis(self.cbox_algorithm.currentIndex(), paint=False)
+                # qcrop = self.change_result_image(self.cbox_algorithm.currentIndex(), paint=False) \
+                #     if not self.save_only_broken else broken_iterative_detection(f, range(195, 225), self.window_h)
+                processed += two_imgs
                 self.progressBar.setValue(int(100 * processed / len(search_results)))
-                print(processed)
+                print(processed, f)
 
                 if self.save_only_broken:
-                    if qcrop is None:
+                    ir_cut = broken_iterative_detection(f, range(195, 225), self.window_h)
+                    if ir_cut is None:
                         continue
-                    qcrop = self.get_QImg(qcrop)
                 dest = os.path.join(self.save_folder, Path(f).name)
-                if qcrop is None:
+                if ir_cut is None:
                     shutil.copy(f, dest)
                 else:
-                    qcrop.save(dest, format="png")
+                    print("save qcrop")
+                    two_imgs = 1
+                    for im, name, e in zip([ir_cut, vis_img], ["IR", "VIS"], ["JPG", "jpg"]):
+                        if im is not None:
+                            two_imgs += 1
+                            fname = dest.replace("_IR.{0}".format(ext), "_{0}.{1}".format(name, e))
+                            qcrop = self.get_QImg(im)
+                            qcrop.save(fname, format=e.lower())
+                    two_imgs = min(2, two_imgs)
+                # if processed == 3:
+                #     break
+            self.progressBar.setValue(100)
             self.img_path = tmp_img_path
             self.setEnabled(True)
 
@@ -160,36 +175,31 @@ class MainApp(QMainWindow, Ui_MainWindow):
     def change_result_image(self, al_index, paint=True):
         if self.img_path and 0 <= al_index < len(self.algorithms):
             algorithm = self.algorithms[al_index]
-            filtered_contours, contour_img = None, None
-            if algorithm == "otsu_threshold":
-                filtered_contours, contour_img = pablo_otsu_pipes_portion(self.img_path)
-            if algorithm == "gabor_filter":
-                filtered_contours, contour_img = \
-                    gabor_pipes(
-                        self.img_path,
-                        cond=lambda x, y, w, h: w * h > 50 and (h / w > 5 or w / h > 5),
-                        thr=self.spinBox_ThrValue.value()
-                    )
-            if algorithm == "simple_matching":
-                contour_img = gray_img_matching(self.img_path, self.matching_img)
+            ir_cut, vis_img, filter_img = self.get_ir_vis(algorithm, paint=paint)
+            # filtered_contours, contour_img = None, None
+            # if algorithm == "otsu_threshold":
+            #     filtered_contours, contour_img = pablo_otsu_pipes_portion(self.img_path)
+            # if algorithm == "gabor_filter":
+            #     filtered_contours, contour_img = \
+            #         gabor_pipes(
+            #             self.img_path,
+            #             cond=lambda x, y, w, h: w * h > 50 and (h / w > 5 or w / h > 5),
+            #             thr=self.spinBox_ThrValue.value()
+            #         )
+            # if algorithm == "simple_matching":
+            #     contour_img = gray_img_matching(self.img_path, self.matching_img)
 
-            if contour_img is not None:
+            if ir_cut is not None:
                 if paint:
-                    filter_qimg = self.get_QImg(contour_img) if algorithm != "simple_matching" else \
-                        self.get_QImg(np.ones_like(contour_img[0], dtype='uint8') * 255)
+                    filter_qimg = self.get_QImg(filter_img) if algorithm != "simple_matching" else \
+                        self.get_QImg(np.ones_like(filter_img, dtype='uint8') * 255)
                     self.lbl_resultImg.setPixmap(QPixmap(filter_qimg))
                     self.lbl_resultImg.setScaledContents(True)
 
-                cut_img, vis_img = \
-                    sorted_x_slide_window(self.img_path, filtered_contours, window_height=self.window_h) \
-                        if algorithm != "simple_matching" else contour_img
-                if vis_img is None and cut_img is not None:
-                    vis_img = np.zeros_like(cut_img, dtype=np.uint8)
-                if algorithm == "gabor_filter" and paint and cut_img is not None:
-                    # CV evaluation of possible broken envelope
-                    cut_img, vis_img, _ = draw_cut_vis_image(cut_img, vis_img, filtered_contours, self.window_h)
-                if cut_img is not None:
-                    detect_qimg = self.get_QImg(cut_img)
+                if vis_img is None and ir_cut is not None:
+                    vis_img = np.zeros_like(ir_cut, dtype=np.uint8)
+                if ir_cut is not None:
+                    detect_qimg = self.get_QImg(ir_cut)
                     if paint:
                         self.lbl_pipesImg.setPixmap(QPixmap(detect_qimg))
                         self.lbl_pipesImg.setScaledContents(True)
@@ -199,6 +209,30 @@ class MainApp(QMainWindow, Ui_MainWindow):
                         self.lbl_VIS_img.setScaledContents(True)
                     return detect_qimg
         return None
+
+    def get_ir_vis(self, algorithm, paint=True):
+        # work only for ir images, and from them it cut also a vis image
+        if algorithm == "otsu_threshold":
+            filtered_contours, contour_img = pablo_otsu_pipes_portion(self.img_path)
+        elif algorithm == "simple_matching":
+            contour_img = gray_img_matching(self.img_path, self.matching_img)
+            filtered_contours = None
+        else:
+            # algorithm == "gabor_filter"
+            filtered_contours, contour_img = \
+                gabor_pipes(
+                    self.img_path,
+                    cond=lambda x, y, w, h: w * h > 50 and (h / w > 5 or w / h > 5),
+                    thr=self.spinBox_ThrValue.value()
+                )
+        if contour_img is None:
+            return None, None, None
+        cut_img, vis_img = sorted_x_slide_window(self.img_path, filtered_contours, window_height=self.window_h) \
+            if algorithm != "simple_matching" else contour_img
+        if algorithm == "gabor_filter" and paint and cut_img is not None:
+            # CV evaluation of possible broken envelope
+            cut_img, vis_img, _ = draw_cut_vis_image(cut_img, vis_img, filtered_contours, self.window_h)
+        return cut_img, vis_img, contour_img
 
     def use_folder_change(self, state):
         if state == QtCore.Qt.Checked:
